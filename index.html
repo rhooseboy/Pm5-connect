@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Concept2 Bio-Dashboard v9 (Biomechanics)</title>
+    <title>Concept2 Bio-Dashboard v10 (Catch Detect)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     
@@ -46,16 +46,12 @@
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
         }
         
-        /* The raw video is hidden, we draw on the canvas output */
-        .input_video {
-            display: none;
-        }
+        .input_video { display: none; }
         
         .output_canvas {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            /* transform: scaleX(-1); Mirror effect optional */ 
         }
 
         .overlay-badge {
@@ -69,7 +65,7 @@
     <!-- Header & Controls -->
     <header class="flex justify-between items-center mb-4">
         <div>
-            <h1 class="text-xl font-bold text-white tracking-tighter">BIO<span class="text-blue-500">_DASH</span> <span class="text-xs text-green-400 align-top">v9</span></h1>
+            <h1 class="text-xl font-bold text-white tracking-tighter">BIO<span class="text-blue-500">_DASH</span> <span class="text-xs text-purple-400 align-top">v10</span></h1>
         </div>
         <div class="flex gap-2">
             <button id="camBtn" class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 px-4 rounded transition-all">
@@ -92,7 +88,6 @@
                 <video class="input_video"></video>
                 <canvas class="output_canvas" id="output_canvas"></canvas>
                 
-                <!-- HUD Overlays -->
                 <div class="absolute top-2 left-2 overlay-badge px-3 py-1 rounded text-xs text-green-400 font-mono border border-green-900/50 flex gap-2">
                     <span id="aiStatus">AI READY</span>
                 </div>
@@ -128,17 +123,16 @@
                 <div class="flex justify-between items-center mb-2">
                     <h3 class="text-sm font-semibold text-gray-400">Force Curve</h3>
                     <div class="flex items-center gap-2">
-                        <div id="strokeIndicator" class="w-2 h-2 rounded-full bg-gray-700"></div>
+                        <div id="strokeIndicator" class="w-2 h-2 rounded-full bg-gray-700 transition-colors duration-100"></div>
                         <span class="text-[10px] text-gray-600">PM5: 0x003D</span>
                     </div>
                 </div>
-                <!-- FIXED HEIGHT CONTAINER -->
                 <div class="relative w-full h-48">
                     <canvas id="forceChart"></canvas>
                 </div>
             </div>
 
-            <!-- Biomechanics Data (New) -->
+            <!-- Biomechanics Data -->
             <div class="grid grid-cols-2 gap-2">
                 <div class="metric-card rounded-xl p-3">
                     <span class="text-[10px] text-gray-500 uppercase block">Drive Length</span>
@@ -155,10 +149,6 @@
                 <div class="flex justify-between border-b border-gray-800 py-1">
                     <span>Distance</span>
                     <span id="distance" class="text-white">0 m</span>
-                </div>
-                <div class="flex justify-between border-b border-gray-800 py-1">
-                    <span>Drag Factor</span>
-                    <span id="dragFactor" class="text-yellow-400">--</span>
                 </div>
                 <div class="flex justify-between border-b border-gray-800 py-1">
                     <span>Heart Rate</span>
@@ -200,11 +190,11 @@
                 const rightVis = results.poseLandmarks[12].visibility * results.poseLandmarks[24].visibility;
                 let top, bottom;
                 if (leftVis > rightVis) {
-                    top = results.poseLandmarks[11]; // Left Shoulder
-                    bottom = results.poseLandmarks[23]; // Left Hip
+                    top = results.poseLandmarks[11];
+                    bottom = results.poseLandmarks[23];
                 } else {
-                    top = results.poseLandmarks[12]; // Right Shoulder
-                    bottom = results.poseLandmarks[24]; // Right Hip
+                    top = results.poseLandmarks[12];
+                    bottom = results.poseLandmarks[24];
                 }
 
                 const deltaX = top.x - bottom.x;
@@ -265,12 +255,12 @@
         const PM5_ROWING_SERVICE_UUID = 'ce060030-43e5-11e4-916c-0800200c9a66';
         const CHAR_GENERAL_STATUS = 'ce060031-43e5-11e4-916c-0800200c9a66'; 
         const CHAR_ADDITIONAL_STATUS_1 = 'ce060032-43e5-11e4-916c-0800200c9a66'; 
-        const CHAR_STROKE_DATA = 'ce060035-43e5-11e4-916c-0800200c9a66'; // Biomechanics (Drive Length etc)
+        const CHAR_STROKE_DATA = 'ce060035-43e5-11e4-916c-0800200c9a66'; 
         const CHAR_FORCE_CURVE = 'ce06003d-43e5-11e4-916c-0800200c9a66'; 
         
         let bluetoothDevice;
         let forceCurvePoints = [];
-        let lastForceTime = 0;
+        let inRecovery = false;
 
         // Chart Setup
         const ctx = document.getElementById('forceChart').getContext('2d');
@@ -321,25 +311,20 @@
                 const server = await bluetoothDevice.gatt.connect();
                 const service = await server.getPrimaryService(PM5_ROWING_SERVICE_UUID);
 
-                // 1. General Status
                 const generalChar = await service.getCharacteristic(CHAR_GENERAL_STATUS);
                 await generalChar.startNotifications();
                 generalChar.addEventListener('characteristicvaluechanged', handleGeneralStatus);
 
-                // 2. Additional Status (Watts/Pace)
                 const addChar1 = await service.getCharacteristic(CHAR_ADDITIONAL_STATUS_1);
                 await addChar1.startNotifications();
                 addChar1.addEventListener('characteristicvaluechanged', handleAdditionalStatus1);
 
-                // 3. Stroke Data (Biomechanics)
                 try {
                     const strokeChar = await service.getCharacteristic(CHAR_STROKE_DATA);
                     await strokeChar.startNotifications();
                     strokeChar.addEventListener('characteristicvaluechanged', handleStrokeData);
-                    log('Subscribed to Stroke Data');
                 } catch(e) { log('No Stroke Data'); }
 
-                // 4. Force Curve
                 try {
                     const forceChar = await service.getCharacteristic(CHAR_FORCE_CURVE);
                     await forceChar.startNotifications();
@@ -365,6 +350,8 @@
 
         function handleAdditionalStatus1(event) {
             const value = event.target.value;
+            
+            // Watts (Sanity check < 2000)
             const w = (value.getUint8(3) | (value.getUint8(4) << 8));
             if(w < 2000) document.getElementById('watts').innerText = w;
 
@@ -377,47 +364,55 @@
 
         function handleStrokeData(event) {
             const value = event.target.value;
-            // Layout typically: [Elapsed(3)] [Distance(3)?] [DriveLength(1)] [DriveTime(1)]
-            // C2 Stroke Data Spec usually:
-            // Bytes 5-6: Drive Length (0.01m)
-            // Bytes 7-8: Drive Time (0.01s)
-            // Bytes 11-12: Stroke Distance (0.01m) 
-            // Bytes 17: Drag Factor (sometimes)
             
             if (value.byteLength > 8) {
-                // Drive Length
                 const driveLenRaw = value.getUint8(5) | (value.getUint8(6) << 8);
                 const driveLenM = driveLenRaw * 0.01;
-                document.getElementById('driveLength').innerText = driveLenM.toFixed(2) + " m";
+                // Filter out bad data (Drive length usually 0.5m - 2.5m)
+                if(driveLenM > 0.5 && driveLenM < 2.5) {
+                    document.getElementById('driveLength').innerText = driveLenM.toFixed(2) + " m";
+                }
 
-                // Drive Time
                 const driveTimeRaw = value.getUint8(7) | (value.getUint8(8) << 8);
                 const driveTimeS = driveTimeRaw * 0.01;
-                document.getElementById('driveTime').innerText = driveTimeS.toFixed(2) + " s";
+                // Filter out bad data (Drive time usually 0.5s - 2.0s)
+                if(driveTimeS > 0.4 && driveTimeS < 4.0) {
+                    document.getElementById('driveTime').innerText = driveTimeS.toFixed(2) + " s";
+                }
             }
-            
-            // Drag Factor check (sometimes at byte 17, simplified check)
-            /*
-            if (value.byteLength > 17) {
-                const drag = value.getUint8(17);
-                if(drag > 0) document.getElementById('dragFactor').innerText = drag;
-            }
-            */
         }
         
         function handleForceCurve(event) {
             const value = event.target.value;
-            const now = Date.now();
             
-            if (now - lastForceTime > 700) {
-                resetGraph();
-            }
-            lastForceTime = now;
-
+            // Parse incoming points
+            let hasNonZero = false;
+            let packetPoints = [];
+            
             for (let i = 0; i < value.byteLength; i += 2) {
                 if (i + 1 < value.byteLength) {
-                    forceCurvePoints.push(value.getUint16(i, true));
+                    const val = value.getUint16(i, true);
+                    packetPoints.push(val);
+                    if (val > 0) hasNonZero = true;
                 }
+            }
+
+            // LOGIC: Catch Detection
+            // If we were in recovery (seeing zeros) and now see force, RESET.
+            if (inRecovery && hasNonZero) {
+                resetGraph();
+                inRecovery = false;
+                log("Catch Detected!");
+            }
+            
+            // If this packet is ALL zeros, we are in recovery
+            if (!hasNonZero) {
+                inRecovery = true;
+            }
+
+            // Append data
+            if(packetPoints.length > 0) {
+                forceCurvePoints.push(...packetPoints);
             }
             
             forceChart.data.datasets[0].data = forceCurvePoints;
@@ -429,8 +424,12 @@
             forceChart.data.datasets[0].data = [];
             forceChart.update();
             const ind = document.getElementById('strokeIndicator');
-            ind.classList.add('bg-green-400');
-            setTimeout(() => ind.classList.remove('bg-green-400'), 100);
+            ind.classList.remove('bg-gray-700');
+            ind.classList.add('bg-green-500');
+            setTimeout(() => {
+                ind.classList.remove('bg-green-500');
+                ind.classList.add('bg-gray-700');
+            }, 150);
         }
 
         function formatTime(s) {
