@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Concept2 PM5 Cockpit v4</title>
+    <title>Concept2 PM5 Cockpit v5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
@@ -26,6 +26,11 @@
             text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
         }
 
+        .val-text {
+            color: #34d399;
+            text-shadow: 0 0 10px rgba(52, 211, 153, 0.3);
+        }
+
         canvas {
             background: #111827;
             border-radius: 0.5rem;
@@ -37,7 +42,7 @@
     <!-- Header -->
     <header class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-white tracking-tighter">PM5<span class="text-blue-500">_LINK</span> <span class="text-xs text-green-400 align-top">v4</span></h1>
+            <h1 class="text-2xl font-bold text-white tracking-tighter">PM5<span class="text-blue-500">_LINK</span> <span class="text-xs text-purple-400 align-top">v5</span></h1>
             <p class="text-xs text-gray-400">Concept2 Bluetooth Interface</p>
         </div>
         <button id="connectBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded flex items-center gap-2 transition-all shadow-lg shadow-blue-900/50">
@@ -50,7 +55,6 @@
 
     <!-- Main Dashboard -->
     <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        
         <!-- Big Metric: Watts -->
         <div class="metric-card rounded-xl p-6 flex flex-col justify-between relative overflow-hidden">
             <span class="text-gray-400 text-sm uppercase tracking-wider">Power</span>
@@ -90,6 +94,31 @@
         </div>
     </main>
 
+    <!-- Biomechanics Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="metric-card rounded-xl p-4 flex flex-col">
+            <span class="text-xs text-gray-500 uppercase tracking-widest">Drive Length</span>
+            <div class="flex items-baseline mt-1">
+                <span id="driveLength" class="text-3xl font-mono text-white val-text">--</span>
+                <span class="ml-1 text-sm text-gray-500">m</span>
+            </div>
+        </div>
+        <div class="metric-card rounded-xl p-4 flex flex-col">
+            <span class="text-xs text-gray-500 uppercase tracking-widest">Drive Time</span>
+            <div class="flex items-baseline mt-1">
+                <span id="driveTime" class="text-3xl font-mono text-white val-text">--</span>
+                <span class="ml-1 text-sm text-gray-500">s</span>
+            </div>
+        </div>
+        <div class="metric-card rounded-xl p-4 flex flex-col">
+            <span class="text-xs text-gray-500 uppercase tracking-widest">Peak Force</span>
+            <div class="flex items-baseline mt-1">
+                <span id="peakForce" class="text-3xl font-mono text-white val-text">--</span>
+                <span class="ml-1 text-sm text-gray-500">N</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Graphs & Technicals -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow">
         
@@ -104,7 +133,7 @@
             </div>
             <div class="h-64 w-full relative">
                 <canvas id="forceChart"></canvas>
-                <!-- Ghost overlay for ideal curve -->
+                <!-- Ghost overlay -->
                 <div class="absolute inset-0 pointer-events-none flex items-end justify-center opacity-10">
                     <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full pb-6 px-2">
                         <path d="M0,100 Q50,0 100,100" fill="none" stroke="white" stroke-width="2" stroke-dasharray="5,5"/>
@@ -115,10 +144,14 @@
 
         <!-- Technical Stats & Log -->
         <div class="metric-card rounded-xl p-6 flex flex-col">
-            <h3 class="text-lg font-semibold text-gray-300 mb-4">Technical Data</h3>
+            <h3 class="text-lg font-semibold text-gray-300 mb-4">Device Status</h3>
             <div class="space-y-4 mb-4">
                 <div class="flex justify-between items-center border-b border-gray-800 pb-2">
-                    <span class="text-gray-400">Total Strokes</span>
+                    <span class="text-gray-400">Drag Factor</span>
+                    <span id="dragFactor" class="text-xl font-mono text-blue-400">--</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+                    <span class="text-gray-400">Stroke Count</span>
                     <span id="strokeCount" class="text-xl font-mono text-purple-400">--</span>
                 </div>
                 <div class="flex justify-between items-center border-b border-gray-800 pb-2">
@@ -132,8 +165,8 @@
             </div>
             
             <div class="flex-grow"></div>
-            <div class="text-xs text-gray-500 mb-1">Debug Log (Hex Data):</div>
-             <div id="statusLog" class="text-xs text-green-400 font-mono h-32 overflow-y-auto border border-gray-800 bg-gray-900 p-2 rounded">
+            <div class="text-xs text-gray-500 mb-1">Debug Log:</div>
+             <div id="statusLog" class="text-xs text-green-400 font-mono h-24 overflow-y-auto border border-gray-800 bg-gray-900 p-2 rounded">
                 Ready to connect...
             </div>
         </div>
@@ -146,6 +179,7 @@
         // Characteristics
         const CHAR_GENERAL_STATUS = 'ce060031-43e5-11e4-916c-0800200c9a66'; 
         const CHAR_ADDITIONAL_STATUS_1 = 'ce060032-43e5-11e4-916c-0800200c9a66'; 
+        const CHAR_STROKE_DATA = 'ce060035-43e5-11e4-916c-0800200c9a66'; // Biomechanics
         const CHAR_FORCE_CURVE = 'ce06003d-43e5-11e4-916c-0800200c9a66'; 
         
         let bluetoothDevice;
@@ -169,20 +203,20 @@
                     backgroundColor: gradient,
                     borderWidth: 3,
                     fill: true,
-                    tension: 0.4, // Smoother curve
+                    tension: 0.4,
                     pointRadius: 0
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: { duration: 0 }, // Instant updates for performance
+                animation: { duration: 0 },
                 scales: {
                     x: { display: false },
                     y: { 
                         beginAtZero: true,
                         grid: { color: '#1f2937' },
-                        ticks: { display: false } // Hide axis numbers for clean look
+                        ticks: { display: false } 
                     }
                 },
                 plugins: { legend: { display: false } }
@@ -207,20 +241,26 @@
                 await generalChar.startNotifications();
                 generalChar.addEventListener('characteristicvaluechanged', handleGeneralStatus);
 
-                // 2. Additional Status (Watts/Pace)
+                // 2. Additional Status
                 const addChar1 = await service.getCharacteristic(CHAR_ADDITIONAL_STATUS_1);
                 await addChar1.startNotifications();
                 addChar1.addEventListener('characteristicvaluechanged', handleAdditionalStatus1);
 
-                // 3. Force Curve
+                // 3. Stroke Data (Biomechanics)
+                try {
+                    const strokeChar = await service.getCharacteristic(CHAR_STROKE_DATA);
+                    await strokeChar.startNotifications();
+                    strokeChar.addEventListener('characteristicvaluechanged', handleStrokeData);
+                    log('Subscribed to Biomechanics (0x0035)');
+                } catch(e) { log('Biomechanics unavailable'); }
+
+                // 4. Force Curve
                 try {
                     const forceChar = await service.getCharacteristic(CHAR_FORCE_CURVE);
                     await forceChar.startNotifications();
                     forceChar.addEventListener('characteristicvaluechanged', handleForceCurve);
                     log('Subscribed to Force Curve (0x003D)');
-                } catch(e) {
-                    log('Force Curve unavailable.');
-                }
+                } catch(e) { log('Force Curve unavailable'); }
 
                 document.getElementById('connectBtn').innerHTML = `<span class="text-green-400">●</span> Connected`;
                 document.getElementById('connectBtn').classList.add('bg-green-900', 'text-green-100', 'border-green-600');
@@ -233,18 +273,10 @@
 
         // --- DATA HANDLERS ---
         
-        // 0x0031: General Status
+        // 0x0031: General Status + Drag Factor
         function handleGeneralStatus(event) {
             const value = event.target.value;
-            // Layout: [Elapsed(3)] [Dist(3)] [Type(1)] [IntType(1)] [SPM(1)] [HR(1)]...
-            // Note: Some docs say Stroke Count is at the end? Let's check byte length.
-            // Actually, Byte 8 is SPM. Byte 9 might be Stroke Count in some firmware.
-            // Let's assume standard C2 mapping for Stroke Count which is typically in "Additional Status 2" 
-            // BUT we can infer a new stroke if Distance jumps or SPM updates.
-            
-            // Actually, let's use a simpler heuristic for V4:
-            // If the Force Curve array gets too big (>50 points), reset it.
-            // OR if we find the Stroke Count.
+            // Layout: [Elapsed(3)] [Dist(3)] [Type(1)] [IntType(1)] [SPM(1)] [HR(1)] ... [Drag(1) @ 17?]
             
             const timeTotal = (value.getUint8(0) | (value.getUint8(1) << 8) | (value.getUint8(2) << 16)) * 0.01;
             updateTime(timeTotal);
@@ -254,14 +286,25 @@
 
             const spm = value.getUint8(8);
             document.getElementById('spm').innerText = spm;
+            
+            // Try to pull drag factor (often at the end of this packet)
+            if(value.byteLength >= 17) { // Check if packet is long enough
+                // Spec says Drag Factor is often around byte 17
+                // Let's check byte 16 or 17 (0-indexed)
+                // C2 Spec: Byte 12 is Workout State... Byte 17 is Drag Factor?
+                // Actually it might vary. Let's peek at the last few bytes
+                const possibleDrag = value.getUint8(value.byteLength - 2); // Guessing location
+                if (possibleDrag > 50 && possibleDrag < 250) {
+                    document.getElementById('dragFactor').innerText = possibleDrag;
+                }
+            }
         }
 
-        // 0x0032: Additional Status 1
+        // 0x0032: Additional Status
         function handleAdditionalStatus1(event) {
             const value = event.target.value;
-            // Layout: [Elapsed(3)] [Speed(2)] [Watts(2)] [HR(1)] [Cals(2)]
             
-            // 1. WATTS (Bytes 3-4 standard offset)
+            // WATTS (Bytes 3-4)
             const wLow = value.getUint8(3);
             const wHigh = value.getUint8(4);
             const wattsRaw = (wLow | (wHigh << 8));
@@ -269,36 +312,59 @@
             if(wattsRaw < 2000) {
                  document.getElementById('watts').innerText = wattsRaw;
                  document.getElementById('wattsBar').style.width = Math.min((wattsRaw/500)*100, 100) + '%';
-                 
-                 // Calculate Pace from Watts
                  if (wattsRaw > 0) {
                      const paceSecs = Math.pow(2.8 / wattsRaw, 1/3) * 500;
                      document.getElementById('pace').innerText = formatTime(paceSecs);
                  }
             }
 
-            // 2. Heart Rate (Byte 7)
+            // Heart Rate (Byte 7)
             const hr = value.getUint8(7);
             if(hr > 0 && hr < 240 && hr !== 255) {
                 document.getElementById('heartRate').innerText = hr;
-            } else {
-                document.getElementById('heartRate').innerText = "--";
             }
             
-            // 3. Stroke Count (Total Strokes)
-            // It is often in Bytes 9-10 of this packet in some firmware versions
-            // Let's try to read it to trigger the graph reset
+            // Stroke Count (Bytes 9-10?)
+            // We'll trust the Stroke Data packet for this mostly, but keep graph reset trigger here just in case
             if(value.byteLength > 10) {
                 const strokeCount = value.getUint8(9) | (value.getUint8(10) << 8);
-                // Simple heuristic check: Stroke count increases slowly (1 every 2-3 sec)
                 if(strokeCount > 0 && strokeCount < 50000) {
                     document.getElementById('strokeCount').innerText = strokeCount;
-                    
-                    // NEW STROKE DETECTED?
-                    if (lastStrokeCount !== -1 && strokeCount > lastStrokeCount) {
-                        resetGraph();
-                    }
+                    if (lastStrokeCount !== -1 && strokeCount > lastStrokeCount) resetGraph();
                     lastStrokeCount = strokeCount;
+                }
+            }
+        }
+        
+        // 0x0035: STROKE DATA (Biomechanics)
+        function handleStrokeData(event) {
+            const value = event.target.value;
+            // Standard C2 Stroke Data Layout (0.01 resolution typically):
+            // Bytes 0-2: Elapsed Time? 
+            // Actually usually:
+            // Byte 3: Drive Length (0.01m)
+            // Byte 4: Drive Time (0.01s)
+            // Byte 9-10: Peak Force (0.1 lbs)
+            
+            // Let's try parsing based on standard offsets:
+            if(value.byteLength >= 10) {
+                // Drive Length (Byte 3 - uint8)
+                const dl = value.getUint8(3);
+                if(dl > 0) document.getElementById('driveLength').innerText = (dl * 0.01).toFixed(2);
+                
+                // Drive Time (Byte 4 - uint8)
+                const dt = value.getUint8(4);
+                if(dt > 0) document.getElementById('driveTime').innerText = (dt * 0.01).toFixed(2);
+                
+                // Peak Force (Bytes 9-10 - uint16 0.1 lbs)
+                // Need to convert Lbs -> Newtons (1 lb = 4.448 N)
+                const pfLow = value.getUint8(9);
+                const pfHigh = value.getUint8(10);
+                const pfLbs = (pfLow | (pfHigh << 8)) * 0.1;
+                
+                if(pfLbs > 0) {
+                    const pfNewtons = pfLbs * 4.448;
+                    document.getElementById('peakForce').innerText = Math.round(pfNewtons);
                 }
             }
         }
@@ -306,25 +372,13 @@
         // 0x003D: Force Curve
         function handleForceCurve(event) {
             const value = event.target.value;
-            
-            // Parse 16-bit integers
             for (let i = 0; i < value.byteLength; i += 2) {
                 if (i + 1 < value.byteLength) {
-                    const val = value.getUint16(i, true); // Little Endian
+                    const val = value.getUint16(i, true); 
                     forceCurvePoints.push(val);
                 }
             }
-            
-            // Safety valve: If we missed the stroke count packet, but graph is huge, clear it
-            if(forceCurvePoints.length > 100) {
-                // Keep the last 50 points (the tail) and discard the old "head"
-                // forceCurvePoints = forceCurvePoints.slice(forceCurvePoints.length - 50);
-                // actually, if it's that big, the stroke is probably over.
-                // Let's just hard cap it to prevent the "Infinite Comb" effect
-                forceCurvePoints = []; 
-            }
-            
-            // Update Chart
+            if(forceCurvePoints.length > 150) forceCurvePoints = []; // Safety cap
             forceChart.data.datasets[0].data = forceCurvePoints;
             forceChart.update();
         }
@@ -334,8 +388,6 @@
             forceCurvePoints = [];
             forceChart.data.datasets[0].data = [];
             forceChart.update();
-            
-            // Visual flash indicator
             const indicator = document.getElementById('strokeIndicator');
             indicator.classList.remove('bg-gray-700');
             indicator.classList.add('bg-green-500');
@@ -361,7 +413,7 @@
 
         function log(msg) {
             const logDiv = document.getElementById('statusLog');
-            // logDiv.innerHTML = `> ${msg}<br>` + logDiv.innerHTML;
+            logDiv.innerHTML = `> ${msg}<br>` + logDiv.innerHTML;
         }
 
         window.addEventListener('beforeunload', () => {
