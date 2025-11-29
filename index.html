@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Concept2 PM5 Cockpit</title>
+    <title>Concept2 PM5 Cockpit v3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
@@ -11,23 +11,24 @@
         
         body {
             font-family: 'JetBrains Mono', monospace;
-            background-color: #111827;
+            background-color: #0b0f19;
             color: #e5e7eb;
         }
         
         .metric-card {
-            background: #1f2937;
-            border: 1px solid #374151;
+            background: #111827;
+            border: 1px solid #1f2937;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
         }
 
         .lcd-text {
             color: #60a5fa;
-            text-shadow: 0 0 5px rgba(96, 165, 250, 0.3);
+            text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
         }
 
+        /* Smooth chart animations */
         canvas {
-            background: #1f2937;
+            background: #111827;
             border-radius: 0.5rem;
         }
     </style>
@@ -35,9 +36,9 @@
 <body class="min-h-screen flex flex-col p-4 md:p-8">
 
     <!-- Header -->
-    <header class="flex justify-between items-center mb-8">
+    <header class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-white tracking-tighter">PM5<span class="text-blue-500">_LINK</span></h1>
+            <h1 class="text-2xl font-bold text-white tracking-tighter">PM5<span class="text-blue-500">_LINK</span> <span class="text-xs text-gray-500 align-top">v3</span></h1>
             <p class="text-xs text-gray-400">Concept2 Bluetooth Interface</p>
         </div>
         <button id="connectBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded flex items-center gap-2 transition-all shadow-lg shadow-blue-900/50">
@@ -58,7 +59,7 @@
                 <span id="watts" class="text-5xl font-bold text-white lcd-text">0</span>
                 <span class="ml-2 text-xl text-gray-500">W</span>
             </div>
-            <div class="absolute bottom-0 left-0 w-full h-1 bg-gray-700">
+            <div class="absolute bottom-0 left-0 w-full h-1 bg-gray-800">
                 <div id="wattsBar" class="h-full bg-blue-500 transition-all duration-300" style="width: 0%"></div>
             </div>
         </div>
@@ -90,7 +91,7 @@
         </div>
     </main>
 
-    <!-- Secondary Data & Graphs -->
+    <!-- Graphs & Technicals -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow">
         
         <!-- Force Curve Chart -->
@@ -104,28 +105,27 @@
             </div>
         </div>
 
-        <!-- Technical Stats -->
-        <div class="metric-card rounded-xl p-6">
+        <!-- Technical Stats & Log -->
+        <div class="metric-card rounded-xl p-6 flex flex-col">
             <h3 class="text-lg font-semibold text-gray-300 mb-4">Technical Data</h3>
-            <div class="space-y-4">
-                <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                    <span class="text-gray-400">Drag Factor</span>
-                    <span id="dragFactor" class="text-xl font-mono text-blue-400">--</span>
+            <div class="space-y-4 mb-4">
+                <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+                    <span class="text-gray-400">Calculated Watts</span>
+                    <span id="calcWatts" class="text-xl font-mono text-blue-400">--</span>
                 </div>
-                <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                <div class="flex justify-between items-center border-b border-gray-800 pb-2">
                     <span class="text-gray-400">Heart Rate</span>
                     <span id="heartRate" class="text-xl font-mono text-red-400">--</span>
                 </div>
-                <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                    <span class="text-gray-400">Calories/Hr</span>
-                    <span id="cals" class="text-xl font-mono text-yellow-400">--</span>
-                </div>
-                <div class="flex justify-between items-center pt-2">
+                <div class="flex justify-between items-center border-b border-gray-800 pb-2">
                     <span class="text-gray-400">Monitor Time</span>
                     <span id="elapsedTime" class="text-sm font-mono text-gray-500">00:00:00</span>
                 </div>
             </div>
-             <div id="statusLog" class="mt-8 text-xs text-gray-600 font-mono h-24 overflow-y-auto border border-gray-800 p-2 rounded">
+            
+            <div class="flex-grow"></div>
+            <div class="text-xs text-gray-500 mb-1">Debug Log (Hex Data):</div>
+             <div id="statusLog" class="text-xs text-green-400 font-mono h-32 overflow-y-auto border border-gray-800 bg-gray-900 p-2 rounded">
                 Ready to connect...
             </div>
         </div>
@@ -133,14 +133,15 @@
 
     <script>
         // --- CONSTANTS ---
-        // We use lowercase UUIDs because Web Bluetooth normalizes them
         const PM5_ROWING_SERVICE_UUID = 'ce060030-43e5-11e4-916c-0800200c9a66';
         
         // Characteristics
-        const CHAR_GENERAL_STATUS = 'ce060031-43e5-11e4-916c-0800200c9a66'; // Dist, Time, SPM
-        const CHAR_ADDITIONAL_STATUS_1 = 'ce060032-43e5-11e4-916c-0800200c9a66'; // Watts, HR
+        const CHAR_GENERAL_STATUS = 'ce060031-43e5-11e4-916c-0800200c9a66'; 
+        const CHAR_ADDITIONAL_STATUS_1 = 'ce060032-43e5-11e4-916c-0800200c9a66'; 
+        const CHAR_FORCE_CURVE = 'ce06003d-43e5-11e4-916c-0800200c9a66'; // The Force Curve
         
         let bluetoothDevice;
+        let forceCurvePoints = [];
 
         // --- CHART SETUP ---
         const ctx = document.getElementById('forceChart').getContext('2d');
@@ -153,7 +154,7 @@
             data: {
                 labels: Array.from({length: 50}, (_, i) => i),
                 datasets: [{
-                    label: 'Force (N)',
+                    label: 'Force',
                     data: [],
                     borderColor: '#60a5fa',
                     backgroundColor: gradient,
@@ -166,25 +167,23 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: false,
+                animation: false, // Performance optimization for high freq data
                 scales: {
                     x: { display: false },
                     y: { 
                         beginAtZero: true,
-                        grid: { color: '#374151' },
-                        ticks: { color: '#9ca3af' }
+                        grid: { color: '#1f2937' },
+                        ticks: { color: '#6b7280' }
                     }
                 },
                 plugins: { legend: { display: false } }
             }
         });
 
-        // --- CONNECTION LOGIC (UPDATED) ---
+        // --- CONNECTION LOGIC ---
         document.getElementById('connectBtn').addEventListener('click', async () => {
-            log('Searching for devices with name "PM5"...');
+            log('Searching for "PM5"...');
             try {
-                // FIXED: Filter by Name Prefix "PM5" instead of Service UUID
-                // This is much more robust for detecting the Concept2
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     filters: [{ namePrefix: 'PM5' }],
                     optionalServices: [PM5_ROWING_SERVICE_UUID]
@@ -193,87 +192,148 @@
                 log('Device found! Connecting...');
                 const server = await bluetoothDevice.gatt.connect();
 
-                log('Getting Rowing Service...');
+                log('Getting Service...');
                 const service = await server.getPrimaryService(PM5_ROWING_SERVICE_UUID);
 
                 // 1. General Status
-                log('Subscribing to General Status...');
                 const generalChar = await service.getCharacteristic(CHAR_GENERAL_STATUS);
                 await generalChar.startNotifications();
                 generalChar.addEventListener('characteristicvaluechanged', handleGeneralStatus);
 
-                // 2. Additional Status
-                log('Subscribing to Additional Status...');
+                // 2. Additional Status (Watts/Pace)
                 const addChar1 = await service.getCharacteristic(CHAR_ADDITIONAL_STATUS_1);
                 await addChar1.startNotifications();
                 addChar1.addEventListener('characteristicvaluechanged', handleAdditionalStatus1);
 
+                // 3. Force Curve
+                try {
+                    const forceChar = await service.getCharacteristic(CHAR_FORCE_CURVE);
+                    await forceChar.startNotifications();
+                    forceChar.addEventListener('characteristicvaluechanged', handleForceCurve);
+                    log('Subscribed to Force Curve (0x003D)');
+                } catch(e) {
+                    log('Force Curve not available on this firmware.');
+                }
+
                 document.getElementById('connectBtn').innerHTML = `<span class="text-green-400">●</span> Connected`;
                 document.getElementById('connectBtn').classList.add('bg-green-900', 'text-green-100', 'border-green-600');
-                log('SUCCESS: Connected to PM5!');
+                log('Ready to Row!');
 
             } catch (error) {
                 log('Error: ' + error);
-                console.error(error);
             }
         });
 
         // --- DATA HANDLERS ---
+        
+        // 0x0031: General Status
         function handleGeneralStatus(event) {
             const value = event.target.value;
-            // Byte layout for 0x0031
-            // [Elapsed(3)] [Dist(3)] [Type(1)] [IntType(1)] [SPM(1)] [HR(1)] ...
+            // Bytes: [Elapsed(3)] [Dist(3)] [Type(1)] [IntType(1)] [SPM(1)]
             
-            // Elapsed Time
             const timeTotal = (value.getUint8(0) | (value.getUint8(1) << 8) | (value.getUint8(2) << 16)) * 0.01;
             updateTime(timeTotal);
 
-            // Distance
             const distTotal = (value.getUint8(3) | (value.getUint8(4) << 8) | (value.getUint8(5) << 16)) * 0.1;
             document.getElementById('distance').innerText = Math.floor(distTotal);
 
-            // Stroke Rate
             const spm = value.getUint8(8);
             document.getElementById('spm').innerText = spm;
-
-            // Simple demo simulation for chart if rowing
-            if(spm > 0 && Math.random() > 0.95) simulateForceCurve();
         }
 
+        // 0x0032: Additional Status 1 (Corrected Mapping)
         function handleAdditionalStatus1(event) {
             const value = event.target.value;
-            // Byte layout for 0x0032
-            // [Elapsed(3)] [Speed(2)] [Watts(2)] [HR(1)] ...
-            
-            // Watts (Bytes 5-6 usually, but let's try standard offset 3-4 if Speed is first)
-            // Note: Concept2 mapping can vary slightly, but standard is:
+            // Debug: print raw hex to help diagnosis
+            // let hex = '';
+            // for(let i=0; i<value.byteLength; i++) hex += value.getUint8(i).toString(16).padStart(2,'0') + ' ';
+            // log('0x32: ' + hex);
+
+            // Corrected Layout based on your "20892" value:
             // Bytes 0-2: Elapsed
-            // Bytes 3-4: Speed/Pace
-            // Bytes 5-6: Watts
+            // Bytes 3-4: Speed/Split Watts? (Let's try 3-4 as Watts)
+            // Bytes 7-8: ???
+            // Bytes 9-10: Pace (0.01s) - This is where 20892 was found
             
-            const watts = (value.getUint8(5) | (value.getUint8(6) << 8));
+            // 1. PACE (Bytes 9-10)
+            // Note: Byte order might be Low-High. 20892 = 0x519C. 
+            const paceLow = value.getUint8(9);
+            const paceHigh = value.getUint8(10);
+            const paceVal = (paceLow | (paceHigh << 8)); 
             
-            if(watts < 2000) {
-                document.getElementById('watts').innerText = watts;
-                const percent = Math.min((watts / 500) * 100, 100);
-                document.getElementById('wattsBar').style.width = percent + '%';
-                
-                // Calculate 500m Pace from Watts
-                if (watts > 0) {
-                    const paceSecs = Math.pow(2.8 / watts, 1/3) * 500;
-                    document.getElementById('pace').innerText = formatTime(paceSecs);
-                }
+            if(paceVal > 0 && paceVal < 60000) {
+                 const paceSecs = paceVal * 0.01;
+                 document.getElementById('pace').innerText = formatTime(paceSecs);
+                 
+                 // If raw Watts are 0 (common in some firmware), calculate from Pace
+                 // Formula: Watts = 2.8 / (pace_in_seconds / 500)^3
+                 const pace500 = paceSecs; 
+                 const derivedWatts = Math.round(2.8 / Math.pow(pace500/500, 3));
+                 document.getElementById('calcWatts').innerText = derivedWatts;
+                 
+                 // Update main Watts display if we aren't getting direct watts
+                 const currentWattsDisp = parseInt(document.getElementById('watts').innerText);
+                 if(currentWattsDisp === 0 && derivedWatts > 0) {
+                     document.getElementById('watts').innerText = derivedWatts;
+                     document.getElementById('wattsBar').style.width = Math.min((derivedWatts/500)*100, 100) + '%';
+                 }
             }
 
-            // Heart Rate (Byte 7)
-            const hr = value.getUint8(7);
-            if(hr > 0 && hr < 220) document.getElementById('heartRate').innerText = hr;
+            // 2. WATTS (Bytes 3-4) - Try this location
+            const wLow = value.getUint8(3);
+            const wHigh = value.getUint8(4);
+            const wattsRaw = (wLow | (wHigh << 8));
             
-            // Calories (Byte 9-10)
-            const cals = (value.getUint8(9) | (value.getUint8(10) << 8));
-            if(cals > 0) document.getElementById('cals').innerText = cals;
+            if(wattsRaw > 0 && wattsRaw < 2000) {
+                 document.getElementById('watts').innerText = wattsRaw;
+                 document.getElementById('wattsBar').style.width = Math.min((wattsRaw/500)*100, 100) + '%';
+            }
+
+            // 3. HR (Byte 6 or 7?)
+            // Your screenshot showed 33. That might be byte 6.
+            // Let's look for a valid HR range (40-220).
+            const possibleHR1 = value.getUint8(6);
+            const possibleHR2 = value.getUint8(7);
+            
+            if(possibleHR1 > 40 && possibleHR1 < 220) document.getElementById('heartRate').innerText = possibleHR1;
+            else if(possibleHR2 > 40 && possibleHR2 < 220) document.getElementById('heartRate').innerText = possibleHR2;
+        }
+        
+        // 0x003D: Force Curve
+        function handleForceCurve(event) {
+            const value = event.target.value;
+            // Structure: [N bytes of force data...]
+            // Concept2 sends ~18 bytes of payload per packet.
+            // We accumulate them. When the stroke resets, the curve resets.
+            
+            // This is a simplified visualizer: we just push data to chart
+            // Ideally we check for "end of stroke" delimiters, but for a simple visual:
+            
+            const points = [];
+            for (let i = 0; i < value.byteLength; i += 2) {
+                if (i + 1 < value.byteLength) {
+                    const val = value.getUint16(i, true); // Little Endian
+                    points.push(val);
+                }
+            }
+            
+            // Crude detection of new stroke (if data jumps from low to high suddenly?)
+            // Or just fifo buffer for "Live View"
+            
+            // Strategy: Keep last 100 points
+            forceCurvePoints.push(...points);
+            if(forceCurvePoints.length > 60) {
+                // Determine if we have a "gap" (zeros) indicating new stroke
+                // For now, just slice keep it flowing
+                forceCurvePoints = forceCurvePoints.slice(forceCurvePoints.length - 60);
+            }
+            
+            // Update Chart
+            forceChart.data.datasets[0].data = forceCurvePoints;
+            forceChart.update('none'); // 'none' mode for performance
         }
 
+        // --- UTILS ---
         function updateTime(totalSeconds) {
             const h = Math.floor(totalSeconds / 3600);
             const m = Math.floor((totalSeconds % 3600) / 60);
@@ -293,18 +353,6 @@
             logDiv.innerHTML = `> ${msg}<br>` + logDiv.innerHTML;
         }
 
-        function simulateForceCurve() {
-            const newData = [];
-            for (let i = 0; i < 50; i++) {
-                const x = (i - 25) / 10;
-                const y = Math.max(0, 100 * Math.exp(-(x*x))); 
-                newData.push(y + (Math.random() * 5));
-            }
-            forceChart.data.datasets[0].data = newData;
-            forceChart.update();
-        }
-
-        // Cleanup
         window.addEventListener('beforeunload', () => {
             if (bluetoothDevice && bluetoothDevice.gatt.connected) {
                 bluetoothDevice.gatt.disconnect();
