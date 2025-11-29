@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Concept2 Bio-Dashboard v6 (AI)</title>
+    <title>Concept2 Bio-Dashboard v7 (AI)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     
@@ -69,7 +69,7 @@
     <!-- Header & Controls -->
     <header class="flex justify-between items-center mb-4">
         <div>
-            <h1 class="text-xl font-bold text-white tracking-tighter">BIO<span class="text-blue-500">_DASH</span> <span class="text-xs text-yellow-400 align-top">AI+</span></h1>
+            <h1 class="text-xl font-bold text-white tracking-tighter">BIO<span class="text-blue-500">_DASH</span> <span class="text-xs text-green-400 align-top">v7</span></h1>
         </div>
         <div class="flex gap-2">
             <button id="camBtn" class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 px-4 rounded transition-all">
@@ -271,6 +271,7 @@
         
         let bluetoothDevice;
         let forceCurvePoints = [];
+        let lastForceTime = 0;
 
         // Chart Setup
         const ctx = document.getElementById('forceChart').getContext('2d');
@@ -366,12 +367,22 @@
         
         function handleForceCurve(event) {
             const value = event.target.value;
+            const now = Date.now();
+            
+            // TIME GAP DETECTION: 
+            // If more than 700ms has passed since the last data packet, 
+            // assume it's a new stroke and clear the graph.
+            if (now - lastForceTime > 700) {
+                resetGraph();
+            }
+            lastForceTime = now;
+
             for (let i = 0; i < value.byteLength; i += 2) {
                 if (i + 1 < value.byteLength) {
                     forceCurvePoints.push(value.getUint16(i, true));
                 }
             }
-            if(forceCurvePoints.length > 70) resetGraph();
+            
             forceChart.data.datasets[0].data = forceCurvePoints;
             forceChart.update();
         }
